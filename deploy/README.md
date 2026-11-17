@@ -14,8 +14,8 @@
 mkdir -p dist
 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/sas-server ./cmd/server
 cp /etc/ssl/certs/ca-certificates.crt dist/ca-certificates.crt
-docker build -f Dockerfile.prebuilt -t uni-agent-search:0.2.4 .
-docker save -o dist/sas-image-0.2.4.tar uni-agent-search:0.2.4
+docker build -f Dockerfile.prebuilt -t uni-agent-search:0.2.5 .
+docker save -o dist/sas-image-0.2.5.tar uni-agent-search:0.2.5
 ```
 
 在 Windows PowerShell 7 中指定自己的 SSH 目标和 WSLC 会话：
@@ -24,7 +24,7 @@ docker save -o dist/sas-image-0.2.4.tar uni-agent-search:0.2.4
 pwsh -NoProfile -File deploy/deploy-wslc.ps1 `
   -RemoteHost user@your-server `
   -Session your-wslc-session `
-  -RemoteDirectory C:\containers\uni-agent-search\releases\0.2.4
+  -RemoteDirectory C:\containers\uni-agent-search\releases\0.2.5
 ```
 
 脚本导入并推送镜像、创建 `sas-data` 数据卷，通过普通用户交互式计划任务启动容器。默认发布到宿主机 `127.0.0.1:8098`；需要其他地址时传入 `-BindAddress`。已存在源码 staging 目录或同名容器时部署停止。临时任务名输出到终端，验收后可自行移除。
@@ -51,7 +51,7 @@ wslc --session your-wslc-session exec uni-agent-search cat /data/credentials.jso
 
 ```powershell
 .\update-wslc.ps1 -Session your-wslc-session `
-  -Image 127.0.0.1:5000/uni-agent-search:0.2.4
+  -Image 127.0.0.1:5000/uni-agent-search:0.2.5
 ```
 
 升级前 inspect 并验证实际配置，确认新镜像已在本地、备份卷未存在，保存 `recovery-*.clixml`。停止容器时给予 20 秒宽限期，将**实际 `/data` 挂载**（自定义 named volume 或 Linux bind mount）完整复制到新备份卷，再以固定 image ID 和原配置重建。
