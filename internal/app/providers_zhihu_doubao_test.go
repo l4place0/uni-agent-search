@@ -345,3 +345,98 @@ func TestProviderKeysNeverReachRequestLog(t *testing.T) {
 }
 
 
+
+// A failing quota endpoint must not turn a possibly exhausted daily quota into a
+// one-minute retry loop: fall back to a five-minute cooldown.
+func TestZhihuQuotaLookupFailureBacksOffLonger(t *testing.T) {
+	a := testApp(t)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/quota" {
+			http.Error(w, "quota service unavailable", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"Code":30001,"Message":"frequency limit","Data":null}`)
+	}))
+	defer up.Close()
+	if _, err := a.db.Exec(`UPDATE providers SET enabled=1,base_url=? WHERE id='zhihu'`, up.URL); err != nil {
+		t.Fatal(err)
+	}
+	id, err := a.addKey("zhihu", "main", "test-zhihu-secret", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := call(a, http.MethodPost, "/v1/search", a.clientToken, `{"query":"Go","providers":["zhihu"],"max_results":3,"no_cache":true}`)
+	var out SearchOutput
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if len(out.Attempts) == 0 || !strings.Contains(out.Attempts[0].Error, "quota unknown") {
+		t.Fatalf("quota lookup failure must be visible, got %+v", out.Attempts)
+	}
+	var cooldown int64
+	if err := a.db.QueryRow(`SELECT cooldown_until FROM api_keys WHERE id=?`, id).Scan(&cooldown); err != nil {
+		t.Fatal(err)
+	}
+	if cooldown < time.Now().Add(4*time.Minute).Unix() || cooldown > time.Now().Add(6*time.Minute).Unix() {
+		t.Fatalf("expected a ~5 minute fallback cooldown, got %d", cooldown)
+	}
+}
+
+// 10412 is a monthly subscription quota: park until the next month start rather
+// than retrying a spent plan every day.
+func TestDoubaoSubscriptionQuotaCoolsUntilNextMonth(t *testing.T) {
+	a := testApp(t)
+	up := doubaoMock(t, 10412, "", "")
+	defer up.Close()
+	if _, err := a.db.Exec(`UPDATE providers SET enabled=1,base_url=? WHERE id='doubao'`, up.URL); err != nil {
+		t.Fatal(err)
+	}
+	id, err := a.addKey("doubao", "main", "test-doubao-secret", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := call(a, http.MethodPost, "/v1/search", a.clientToken, `{"query":"Go","providers":["doubao"],"max_results":3,"no_cache":true}`)
+	var out SearchOutput
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if len(out.Attempts) == 0 || !strings.Contains(out.Attempts[0].Error, "subscription quota exhausted") {
+		t.Fatalf("subscription quota must be classified, got %+v", out.Attempts)
+	}
+	var cooldown int64
+	if err := a.db.QueryRow(`SELECT cooldown_until FROM api_keys WHERE id=?`, id).Scan(&cooldown); err != nil {
+		t.Fatal(err)
+	}
+	want := nextMonthlyReset().Unix()
+	if cooldown != want {
+		t.Fatalf("subscription quota must cool until the next month start %d, got %d", want, cooldown)
+	}
+}
+
+// The HTTP-layer 429 path is shared with every other provider and honours
+// Retry-After; cover it for doubao explicitly.
+func TestDoubaoHTTP429HonoursRetryAfter(t *testing.T) {
+	a := testApp(t)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "30")
+		http.Error(w, "slow down", http.StatusTooManyRequests)
+	}))
+	defer up.Close()
+	if _, err := a.db.Exec(`UPDATE providers SET enabled=1,base_url=? WHERE id='doubao'`, up.URL); err != nil {
+		t.Fatal(err)
+	}
+	id, err := a.addKey("doubao", "main", "test-doubao-secret", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := call(a, http.MethodPost, "/v1/search", a.clientToken, `{"query":"Go","providers":["doubao"],"max_results":3,"no_cache":true}`)
+	var out SearchOutput
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if len(out.Attempts) == 0 || !strings.Contains(out.Attempts[0].Error, "upstream HTTP 429") {
+		t.Fatalf("HTTP 429 must surface, got %+v", out.Attempts)
+	}
+	var cooldown int64
+	if err := a.db.QueryRow(`SELECT cooldown_until FROM api_keys WHERE id=?`, id).Scan(&cooldown); err != nil {
+		t.Fatal(err)
+	}
+	if cooldown < time.Now().Add(20*time.Second).Unix() || cooldown > time.Now().Add(90*time.Second).Unix() {
+		t.Fatalf("Retry-After=30 must produce a ~30s cooldown, got %d", cooldown)
+	}
+}
