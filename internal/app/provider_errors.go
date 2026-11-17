@@ -67,8 +67,16 @@ func (a *App) zhihuError(ctx context.Context, p Provider, key string, code int) 
 	case 20001:
 		return providerCodeError{provider: "zhihu", code: code, status: 401, detail: codeLabel("zhihu", code, "auth rejected")}
 	case 30001:
-		if remaining, ok := a.zhihuRemaining(ctx, p, key); ok && remaining <= 0 {
+		remaining, known := a.zhihuRemaining(ctx, p, key)
+		if known && remaining <= 0 {
 			return providerCodeError{provider: "zhihu", code: code, status: 402, cooldown: nextDailyReset().Unix(), detail: codeLabel("zhihu", code, "daily quota exhausted")}
+		}
+		if !known {
+			// The quota endpoint is unavailable, so an exhausted daily quota
+			// cannot be told apart from a burst limit. Back off longer than the
+			// usual minute rather than re-hitting a possibly exhausted key every
+			// minute; the quota endpoint failing is rare and self-healing.
+			return providerCodeError{provider: "zhihu", code: code, status: 429, cooldown: time.Now().Add(5 * time.Minute).Unix(), detail: codeLabel("zhihu", code, "rate limited (quota unknown)")}
 		}
 		return providerCodeError{provider: "zhihu", code: code, status: 429, cooldown: time.Now().Add(time.Minute).Unix(), detail: codeLabel("zhihu", code, "rate limited")}
 	case 10001:
@@ -154,7 +162,9 @@ func doubaoError(codeN int, code string) error {
 	case 10406:
 		return providerCodeError{provider: "doubao", code: codeNum, status: 402, cooldown: nextMonthlyReset().Unix(), detail: codeLabel("doubao", codeNum, "free quota exhausted")}
 	case 10412:
-		return providerCodeError{provider: "doubao", code: codeNum, status: 402, cooldown: time.Now().Add(24 * time.Hour).Unix(), detail: codeLabel("doubao", codeNum, "subscription quota exhausted")}
+		// Subscription plans bill monthly and the API exposes no reset timestamp.
+		// Park until the next month start instead of re-hitting a spent plan daily.
+		return providerCodeError{provider: "doubao", code: codeNum, status: 402, cooldown: nextMonthlyReset().Unix(), detail: codeLabel("doubao", codeNum, "subscription quota exhausted")}
 	case 10408, 10409, 10410:
 		return providerCodeError{provider: "doubao", code: codeNum, status: 402, cooldown: time.Now().Add(24 * time.Hour).Unix(), detail: codeLabel("doubao", codeNum, "billing or plan unavailable")}
 	case 700429:

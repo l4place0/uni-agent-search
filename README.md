@@ -91,8 +91,8 @@ sh 客户端依赖 curl、jq。将整个 `skills/uni-agent-search` 目录复制�
 
 两者都是 HTTP 200 + 业务码，错误分类集中在 `internal/app/provider_errors.go`，走同一套 Key 池、并发上限、冷却与停用逻辑。
 
-- **知乎搜索**（`zhihu`）：`GET {base}/api/v1/content/zhihu_search?Query=&Count=`，头带 `Authorization: Bearer <Access Secret>` 与秒级 `X-Request-Timestamp`。单次最多 10 条。`20001` 鉴权失败停用 Key；`30001` 先查 `/api/v1/quota`（不消耗额度）：剩余为 0 判为当日额度耗尽、冷却到次日 0 点，否则按限流冷却 60 秒；`10001` 参数错误不重试。
-- **豆包搜索**（`doubao`，火山引擎「联网搜索」Custom 版）：`POST {base}/search_api/web_search`，头带 `Authorization: Bearer <API Key>`，请求 `SearchType=web`、`Count<=50`、`Filter.NeedUrl=true`。摘要优先取 `Summary`（500–1000 字，适合 Agent），没有则退回 `Snippet`。`700429` 限流冷却 60 秒；`10406` 冷却到下月 1 日，`10412/10410/10408/10409` 冷却 24 小时；`700901/10401` 停用 Key。
+- **知乎搜索**（`zhihu`）：`GET {base}/api/v1/content/zhihu_search?Query=&Count=`，头带 `Authorization: Bearer <Access Secret>` 与秒级 `X-Request-Timestamp`。单次最多 10 条。`20001` 鉴权失败停用 Key；`30001` 先查 `/api/v1/quota`（不消耗额度）：剩余为 0 判为当日额度耗尽、冷却到次日 0 点；额度接口不可用时退化为 5 分钟冷却（不把可能耗尽的额度当一分钟限流反复重试）；剩余充足则按限流冷却 60 秒。`10001` 参数错误不重试。
+- **豆包搜索**（`doubao`，火山引擎「联网搜索」Custom 版）：`POST {base}/search_api/web_search`，头带 `Authorization: Bearer <API Key>`，请求 `SearchType=web`、`Count<=50`、`Filter.NeedUrl=true`。摘要优先取 `Summary`（500–1000 字，适合 Agent），没有则退回 `Snippet`。`700429` 与 HTTP 429 按限流冷却（尊重 `Retry-After`）；`10406` 冷却到下月 1 日，`10412`（订阅套餐额度不足，套餐按月计费且接口不返回重置时间）同样冷却到下月 1 日，`10410/10408/10409` 冷却 24 小时；`700901/10401` 停用 Key。
 - 额度耗尽是账户状态而不是坏凭据：Key 保持启用、只做长冷却，不会进入「换 Key 短冷却重试」的路径。
 - 知乎直答（生成式回答）暂未接入：它带生成不是纯检索，单独评估。
 
