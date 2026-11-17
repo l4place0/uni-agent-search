@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory)][string]$Session,
   [ValidateSet('uni-agent-search','super-agent-search')][string]$ContainerName='uni-agent-search',
-  [string]$Image='127.0.0.1:5000/uni-agent-search:0.2.5',
+  [string]$Image='127.0.0.1:5000/uni-agent-search:0.3.0',
   [string]$BackupVolume=('sas-backup-'+(Get-Date -Format yyyyMMddHHmmss)+'-'+[guid]::NewGuid().ToString('N').Substring(0,8)),
   [string]$HealthURL='',
   [string]$PlanPath=(Join-Path $PSScriptRoot ('recovery-'+[guid]::NewGuid().ToString('N')+'.clixml'))
