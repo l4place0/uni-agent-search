@@ -5,7 +5,7 @@ param(
   [string]$RemoteDirectory = 'C:\containers\uni-agent-search',
   [int]$Port = 8098,
   [string]$BindAddress = '127.0.0.1',
-  [string]$Tag = '0.2.5',
+  [string]$Tag = '0.3.0',
   [string]$ImageArchive = ''
 )
 $ErrorActionPreference = 'Stop'

@@ -108,6 +108,24 @@ func (a *App) requestProvider(ctx context.Context, p Provider, key, query string
 		u.RawQuery = values.Encode()
 		headers["X-Subscription-Token"] = key
 		headers["Cache-Control"] = "no-cache"
+	case "zhihu":
+		u.Path = strings.TrimRight(u.Path, "/") + "/api/v1/content/zhihu_search"
+		values.Set("Query", query)
+		values.Set("Count", strconv.Itoa(min(count, 10)))
+		u.RawQuery = values.Encode()
+		headers["Authorization"] = "Bearer " + key
+		headers["X-Request-Timestamp"] = strconv.FormatInt(time.Now().Unix(), 10)
+	case "doubao":
+		u.Path = strings.TrimRight(u.Path, "/") + "/search_api/web_search"
+		method = http.MethodPost
+		body = map[string]any{
+			"Query":        query,
+			"SearchType":   "web",
+			"Count":        min(count, 50),
+			"Filter":       map[string]any{"NeedUrl": true},
+			"QueryControl": map[string]any{"QueryRewrite": false},
+		}
+		headers["Authorization"] = "Bearer " + key
 	case "exa":
 		u.Path = strings.TrimRight(u.Path, "/") + "/search"
 		method = "POST"
@@ -200,6 +218,64 @@ func (a *App) requestProvider(ctx context.Context, p Provider, key, query string
 				snippet = i.Text
 			}
 			hits = append(hits, Hit{Title: i.Title, URL: i.URL, Snippet: snippet})
+		}
+	case "zhihu":
+		var data struct {
+			Code int
+			Data struct {
+				Items []struct {
+					Title       string
+					ContentText string
+					Url         string
+					AuthorName  string
+					CreateTime  int64
+				}
+			}
+		}
+		if err = json.Unmarshal(b, &data); err != nil {
+			return nil, errors.New("invalid search response")
+		}
+		if data.Code != 0 {
+			return nil, a.zhihuError(ctx, p, key, data.Code)
+		}
+		for _, i := range data.Data.Items {
+			hits = append(hits, Hit{Title: i.Title, URL: i.Url, Snippet: i.ContentText, Author: i.AuthorName, PublishedAt: unixTime(i.CreateTime)})
+		}
+	case "doubao":
+		var data struct {
+			ResponseMetadata struct {
+				Error *struct {
+					CodeN   int
+					Code    string
+					Message string
+				}
+			}
+			Result *struct {
+				WebResults []struct {
+					Title       string
+					Url         string
+					Snippet     string
+					Summary     string
+					PublishTime string
+					AuthorInfo  struct{ Name string }
+				}
+			}
+		}
+		if err = json.Unmarshal(b, &data); err != nil {
+			return nil, errors.New("invalid search response")
+		}
+		if data.ResponseMetadata.Error != nil {
+			return nil, doubaoError(data.ResponseMetadata.Error.CodeN, data.ResponseMetadata.Error.Code)
+		}
+		if data.Result == nil {
+			return nil, errors.New("invalid search response")
+		}
+		for _, i := range data.Result.WebResults {
+			snippet := i.Summary
+			if snippet == "" {
+				snippet = i.Snippet
+			}
+			hits = append(hits, Hit{Title: i.Title, URL: i.Url, Snippet: snippet, Author: i.AuthorInfo.Name, PublishedAt: i.PublishTime})
 		}
 	}
 	if len(hits) > count {

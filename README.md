@@ -2,7 +2,7 @@
 
 面向 Agent 的自托管搜索服务。Go 服务端包含 Web 控制台；客户端是可随 Skill 分发的 sh/pwsh 脚本。
 
-v0.2.5 提供 Bing RSS / DuckDuckGo 免 Key 搜索，Tavily、Brave、Exa API，Grok / xAI 官方 Responses 联网搜索、Grok 兼容中转 Chat Completions，以及自建 SearXNG JSON 搜索。多服务商并行检索，URL 去重并保留排名来源；Bing/DDG 按相关组降低重复加分。API Key 池使用加权轮询，支持并发上限、429 冷却、401/403 停用及单请求最多 3 个 Key 尝试。服务商网络错误和 5xx 不轮番重试全部 Key。
+v0.3.0 提供 Bing RSS / DuckDuckGo 免 Key 搜索，Tavily、Brave、Exa、知乎搜索、豆包搜索 API，Grok / xAI 官方 Responses 联网搜索、Grok 兼容中转 Chat Completions，以及自建 SearXNG JSON 搜索。多服务商并行检索，URL 去重并保留排名来源；Bing/DDG 按相关组降低重复加分。API Key 池使用加权轮询，支持并发上限、429 冷却、401/403 停用及单请求最多 3 个 Key 尝试。服务商网络错误和 5xx 不轮番重试全部 Key。
 
 ## 本地运行
 
@@ -86,3 +86,14 @@ sh 客户端依赖 curl、jq。将整个 `skills/uni-agent-search` 目录复制�
 - Grok 默认停用，需要用户填写有效 Key 和账户可用模型；默认模型名称可以修改。搜索总体超时 90 秒，客户端超时 100 秒，服务商超时可配置为 2–75 秒。
 
 接口依据：[xAI Web Search](https://docs.x.ai/developers/tools/web-search)、[xAI Citations](https://docs.x.ai/developers/tools/citations)、[SearXNG Search API](https://docs.searxng.org/dev/search_api.html)。
+
+## 知乎与豆包接入
+
+两者都是 HTTP 200 + 业务码，错误分类集中在 `internal/app/provider_errors.go`，走同一套 Key 池、并发上限、冷却与停用逻辑。
+
+- **知乎搜索**（`zhihu`）：`GET {base}/api/v1/content/zhihu_search?Query=&Count=`，头带 `Authorization: Bearer <Access Secret>` 与秒级 `X-Request-Timestamp`。单次最多 10 条。`20001` 鉴权失败停用 Key；`30001` 先查 `/api/v1/quota`（不消耗额度）：剩余为 0 判为当日额度耗尽、冷却到次日 0 点，否则按限流冷却 60 秒；`10001` 参数错误不重试。
+- **豆包搜索**（`doubao`，火山引擎「联网搜索」Custom 版）：`POST {base}/search_api/web_search`，头带 `Authorization: Bearer <API Key>`，请求 `SearchType=web`、`Count<=50`、`Filter.NeedUrl=true`。摘要优先取 `Summary`（500–1000 字，适合 Agent），没有则退回 `Snippet`。`700429` 限流冷却 60 秒；`10406` 冷却到下月 1 日，`10412/10410/10408/10409` 冷却 24 小时；`700901/10401` 停用 Key。
+- 额度耗尽是账户状态而不是坏凭据：Key 保持启用、只做长冷却，不会进入「换 Key 短冷却重试」的路径。
+- 知乎直答（生成式回答）暂未接入：它带生成不是纯检索，单独评估。
+
+接口依据：[知乎开放平台文档](https://developer.zhihu.com/docs)、[豆包搜索 Custom 版 API](https://docs.volcengine.com/docs/zh/networked-search/networked-search.md)。

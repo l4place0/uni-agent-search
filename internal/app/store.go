@@ -19,7 +19,7 @@ import (
 	"uni-agent-search/internal/credential"
 )
 
-const Version = "0.2.5"
+const Version = "0.3.0"
 
 type Provider struct {
 	ID         string `json:"id"`
@@ -217,6 +217,8 @@ CREATE INDEX IF NOT EXISTS requests_created ON requests(created_at);
 		{ID: "tavily", Name: "Tavily", Kind: "tavily", BaseURL: "https://api.tavily.com", Timeout: 15},
 		{ID: "brave", Name: "Brave", Kind: "brave", BaseURL: "https://api.search.brave.com", Timeout: 15},
 		{ID: "exa", Name: "Exa", Kind: "exa", BaseURL: "https://api.exa.ai", Timeout: 15},
+		{ID: "zhihu", Name: "知乎搜索", Kind: "zhihu", BaseURL: "https://developer.zhihu.com", Timeout: 15},
+		{ID: "doubao", Name: "豆包搜索", Kind: "doubao", BaseURL: "https://open.feedcoopapi.com", Timeout: 15},
 		{ID: "xai", Name: "Grok / xAI 官方", Kind: "xai", BaseURL: "https://api.x.ai/v1", Timeout: 60, Model: "grok-4.7", SearchMode: "web"},
 		{ID: "grok-compatible", Name: "Grok / 兼容中转", Kind: "grok-compatible", BaseURL: "https://api.x.ai/v1", Timeout: 60, Model: "grok-4.7"},
 		{ID: "searxng", Name: "SearXNG", Kind: "searxng", BaseURL: "http://localhost:8888", Timeout: 15},

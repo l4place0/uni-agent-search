@@ -20,8 +20,23 @@ func classifyProviderOutcome(err error, now time.Time) providerOutcome {
 		return providerOutcome{status: 200}
 	}
 	out := providerOutcome{reason: err.Error()}
+	var coded providerCodeError
 	var upstream upstreamError
-	if errors.As(err, &upstream) {
+	switch {
+	// Providers that answer HTTP 200 with a business code in the body.
+	case errors.As(err, &coded):
+		out.status = coded.status
+		switch coded.status {
+		case 401, 403:
+			out.retry = true
+		case 402, 429:
+			out.cooldown = coded.cooldown
+			if out.cooldown == 0 {
+				out.cooldown = now.Add(time.Minute).Unix()
+			}
+			out.retry = true
+		}
+	case errors.As(err, &upstream):
 		out.status = upstream.status
 		switch upstream.status {
 		case 401, 403:

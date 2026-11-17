@@ -25,6 +25,14 @@ const providerNotes = {
     caption: "语义搜索与来源发现",
     hint: "填写 Exa API 根地址，在下方配置 Key 和轮询权重。",
   },
+  zhihu: {
+    caption: "知乎站内搜索 · 每日额度",
+    hint: "地址填知乎开放平台根地址（默认 https://developer.zhihu.com），Key 为个人中心的 Access Secret。每日额度 5000 次；额度用尽会冷却到次日 0 点，不会当临时限流反复重试。",
+  },
+  doubao: {
+    caption: "豆包搜索 · 每月额度",
+    hint: "地址填豆包搜索（联网搜索 Custom 版）根地址（默认 https://open.feedcoopapi.com），Key 为控制台创建的 API Key。每月免费 500 次；错误码 10406/10412 按额度耗尽处理，冷却到下月或 24 小时。",
+  },
   bing: {
     caption: "公共 RSS 搜索 · 免 Key",
     hint: "公共搜索入口可能返回限流或不相关结果，可随时停用。",

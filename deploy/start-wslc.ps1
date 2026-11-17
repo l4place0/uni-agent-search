@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory)][string]$Session,
-  [string]$Image='127.0.0.1:5000/uni-agent-search:0.2.5',
+  [string]$Image='127.0.0.1:5000/uni-agent-search:0.3.0',
   [string[]]$Bind=@('127.0.0.1:8098:8080'),
   [string]$DataVolume='sas-data',
   [string]$ProxyURL='',
