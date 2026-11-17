@@ -54,6 +54,19 @@ wslc --session your-wslc-session exec uni-agent-search cat /data/credentials.jso
   -Image 127.0.0.1:5000/uni-agent-search:0.2.5
 ```
 
+`-ContainerName` 默认 `uni-agent-search`，只接受 `uni-agent-search` / `super-agent-search`。改名（v0.2.5）之前创建、仍叫 `super-agent-search` 的容器必须显式传入，否则脚本查不到容器会直接失败：
+
+```powershell
+.\update-wslc.ps1 -Session your-wslc-session -ContainerName super-agent-search `
+  -Image 127.0.0.1:5000/uni-agent-search:0.2.5
+```
+
+先确认实际容器名：
+
+```powershell
+wslc --session your-wslc-session system session run docker ps -a --format '{{.Names}}`t{{.Image}}'
+```
+
 升级前 inspect 并验证实际配置，确认新镜像已在本地、备份卷未存在，保存 `recovery-*.clixml`。停止容器时给予 20 秒宽限期，将**实际 `/data` 挂载**（自定义 named volume 或 Linux bind mount）完整复制到新备份卷，再以固定 image ID 和原配置重建。
 
 健康验收同时读取目标容器内 `/readyz` 和 Windows 发布入口，比较实例 ID 与版本；只返回 HTTP 200 不算通过。默认从已保存的首个 Bind 派生 URL，特殊路由可传 `-HealthURL`。镜像必须包含新 `/readyz` 和 Alpine 的 wget/cp/sh 工具；旧镜像仅用于恢复，不可直接作为新健康协议的目标。
