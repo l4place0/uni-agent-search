@@ -99,6 +99,15 @@ func TestSkillClientsAgainstMockHTTP(t *testing.T) {
 						args = []string{"-NoProfile", "-File", script}
 					}
 					args = append(args, tc.args...)
+					// On Windows the argv of a Go exec reaches an MSYS2 sh through
+					// the Windows command line, which re-parses it and drops a
+					// backslash from `and \\ paths`; Git Bash users never take that
+					// route. Invoke the same argv from inside the POSIX shell via a
+					// wrapper so the client is exercised with byte-exact arguments
+					// on every platform instead of skipping the case on Windows.
+					if client == "sh" {
+						args = []string{writeShWrapper(t, script, tc.args)}
+					}
 					cmd := exec.CommandContext(ctx, client, args...)
 					for _, entry := range os.Environ() {
 						if !strings.HasPrefix(entry, "SAS_URL=") && !strings.HasPrefix(entry, "SAS_TOKEN=") && !strings.HasPrefix(entry, "SAS_TOKEN_FILE=") {
@@ -138,4 +147,26 @@ func TestSkillClientsAgainstMockHTTP(t *testing.T) {
 			}
 		})
 	}
+}
+
+// writeShWrapper writes a tiny POSIX script that execs the client with exactly
+// the given argv. Everything is single-quoted here, on disk, so no Windows
+// command-line re-parsing is involved between the test and the POSIX shell.
+func writeShWrapper(t *testing.T, script string, args []string) string {
+	t.Helper()
+	var b strings.Builder
+	b.WriteString("exec " + posixQuote(script))
+	for _, arg := range args {
+		b.WriteString(" " + posixQuote(arg))
+	}
+	b.WriteString("\n")
+	path := filepath.Join(t.TempDir(), "invoke-client.sh")
+	if err := os.WriteFile(path, []byte(b.String()), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func posixQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }

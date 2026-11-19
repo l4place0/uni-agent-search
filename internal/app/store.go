@@ -85,7 +85,10 @@ func privateFile(path string, value []byte) error {
 	if _, err = f.Write(value); err != nil {
 		return err
 	}
-	return f.Sync()
+	if err = f.Sync(); err != nil {
+		return err
+	}
+	return protectPrivateFile(path)
 }
 func New(dir string) (*App, error) {
 	if dir == "" {
@@ -106,6 +109,11 @@ func New(dir string) (*App, error) {
 		}
 	} else if err != nil {
 		return nil, err
+	}
+	// Narrow a key file that already existed, not just a freshly created one:
+	// data directories written by an older build carry the loose inherited ACL.
+	if err = protectPrivateFile(keyPath); err != nil {
+		return nil, fmt.Errorf("restrict permissions on %s: %w", keyPath, err)
 	}
 	keyCipher, err := credential.New(master)
 	if err != nil {
@@ -128,6 +136,9 @@ func New(dir string) (*App, error) {
 		return nil, err
 	} else if err = json.Unmarshal(data, &creds); err != nil {
 		return nil, err
+	}
+	if err = protectPrivateFile(credsPath); err != nil {
+		return nil, fmt.Errorf("restrict permissions on %s: %w", credsPath, err)
 	}
 	if v := os.Getenv("SAS_ADMIN_TOKEN"); v != "" {
 		creds.Admin = v
