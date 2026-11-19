@@ -2,7 +2,7 @@
 
 面向 Agent 的自托管搜索服务。Go 服务端包含 Web 控制台；客户端是可随 Skill 分发的 sh/pwsh 脚本。
 
-v0.3.0 提供 Bing RSS / DuckDuckGo 免 Key 搜索，Tavily、Brave、Exa、知乎搜索、豆包搜索 API，Grok / xAI 官方 Responses 联网搜索、Grok 兼容中转 Chat Completions，以及自建 SearXNG JSON 搜索。多服务商并行检索，URL 去重并保留排名来源；Bing/DDG 按相关组降低重复加分。API Key 池使用加权轮询，支持并发上限、429 冷却、401/403 停用及单请求最多 3 个 Key 尝试。服务商网络错误和 5xx 不轮番重试全部 Key。
+v0.3.1 提供 Bing RSS / DuckDuckGo 免 Key 搜索，Tavily、Brave、Exa、知乎搜索、豆包搜索 API，Grok / xAI 官方 Responses 联网搜索、Grok 兼容中转 Chat Completions，以及自建 SearXNG JSON 搜索。多服务商并行检索，URL 去重并保留排名来源；Bing/DDG 按相关组降低重复加分。API Key 池使用加权轮询，支持并发上限、429 冷却、401/403 停用及单请求最多 3 个 Key 尝试。服务商网络错误和 5xx 不轮番重试全部 Key。
 
 ## 本地运行
 

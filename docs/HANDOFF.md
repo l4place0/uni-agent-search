@@ -55,7 +55,7 @@ Rename-Item -LiteralPath .\super-agent-search -NewName uni-agent-search
 - 线上容器、数据卷、计划任务尚未改动。本交接不授权自动部署、停止服务或迁移数据。
 - `SAS_*` 环境变量继续使用；没有实现 `UAS_*` 别名。
 - `sas-data` 数据卷、`sas-server` 构建产物名、`sas-image-*.tar`、`sas-admin` 会话键等刻意保留兼容；不要机械替换所有 sas 字符串。
-- API、端口、数据库/凭据文件格式未因改名变化。版本为 `0.3.0`（知乎 / 豆包搜索接入；`0.2.4` 之后的修复见 release notes）。
+- API、端口、数据库/凭据文件格式未因改名变化。版本为 `0.3.1`（Brave `Accept` 头修复；`0.3.0` 起接入知乎 / 豆包搜索，`0.2.4` 之后的修复见 release notes）。
 - 不读取/打印私有 token、provider secret、master.key；不要提交 `*.local*`、数据库、凭据、`dist/` 历史产物或本机连接信息。
 - 用 httptest、临时数据库、假 Key 测试；默认不访问真实供应商、不产生付费调用。
 - upstream transport 允许管理员指定内网 SearXNG；public fetch 才执行公网 SSRF 边界。不要把前者误判为客户端漏洞或为了测试关闭后者防护。

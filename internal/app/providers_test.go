@@ -10,12 +10,17 @@ import (
 	"testing"
 )
 
-func TestBraveSearchAndConnectionTestsSendNoCache(t *testing.T) {
+func TestBraveSearchAndConnectionTestsSendNoCacheAndJSONAccept(t *testing.T) {
 	a := testApp(t)
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Cache-Control") != "no-cache" {
 			// Reproduce Brave's validation failure before authentication/search.
 			http.Error(w, "invalid cache-control header", http.StatusUnprocessableEntity)
+			return
+		}
+		if r.Header.Get("Accept") != "application/json" {
+			// Brave's gateway only accepts "application/json" or "*/*".
+			http.Error(w, "invalid accept header", http.StatusUnprocessableEntity)
 			return
 		}
 		if r.Method != http.MethodGet || r.URL.Path != "/res/v1/web/search" || r.URL.Query().Get("q") == "" || r.URL.Query().Get("count") == "" {
