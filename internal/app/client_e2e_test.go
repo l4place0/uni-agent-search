@@ -149,13 +149,15 @@ func TestSkillClientsAgainstMockHTTP(t *testing.T) {
 	}
 }
 
-// writeShWrapper writes a tiny POSIX script that execs the client with exactly
+// writeShWrapper writes a tiny POSIX script that runs the client with exactly
 // the given argv. Everything is single-quoted here, on disk, so no Windows
-// command-line re-parsing is involved between the test and the POSIX shell.
+// command-line re-parsing is involved between the test and the POSIX shell. The
+// client is started through sh, as the test does directly, so it needs no
+// executable bit.
 func writeShWrapper(t *testing.T, script string, args []string) string {
 	t.Helper()
 	var b strings.Builder
-	b.WriteString("exec " + posixQuote(script))
+	b.WriteString("exec sh " + posixQuote(script))
 	for _, arg := range args {
 		b.WriteString(" " + posixQuote(arg))
 	}
