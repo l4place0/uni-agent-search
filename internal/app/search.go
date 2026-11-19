@@ -19,6 +19,16 @@ import (
 	"golang.org/x/net/html"
 )
 
+// defaultAccept keeps Bing's RSS feed (XML) and JSON APIs working from the same
+// code path; providers that validate Accept strictly override it below.
+const defaultAccept = "application/json,application/xml,text/html"
+
+// braveAccept: Brave's gateway validates the Accept header against an enum and
+// rejects anything else with 422 VALIDATION ("Input should be 'application/json'
+// or '*/*'") before the request reaches search. We send the exact JSON type
+// rather than "*/*" so a future Brave change cannot silently widen the response.
+const braveAccept = "application/json"
+
 type Hit struct {
 	Title       string         `json:"title"`
 	URL         string         `json:"url"`
@@ -108,6 +118,7 @@ func (a *App) requestProvider(ctx context.Context, p Provider, key, query string
 		u.RawQuery = values.Encode()
 		headers["X-Subscription-Token"] = key
 		headers["Cache-Control"] = "no-cache"
+		headers["Accept"] = braveAccept
 	case "zhihu":
 		u.Path = strings.TrimRight(u.Path, "/") + "/api/v1/content/zhihu_search"
 		values.Set("Query", query)
@@ -142,7 +153,7 @@ func (a *App) requestProvider(ctx context.Context, p Provider, key, query string
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/json,application/xml,text/html")
+	req.Header.Set("Accept", defaultAccept)
 	req.Header.Set("User-Agent", "UniAgentSearch/"+Version)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
