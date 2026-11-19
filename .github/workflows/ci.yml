@@ -34,3 +34,55 @@ jobs:
             [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
             if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
           }
+
+  # permissions_windows.go and the *_windows_test.go files are behind build
+  # constraints: they compile and run on Windows only, so the ubuntu job above
+  # can never reach them. This job repeats go vet and the whole test suite on
+  # Windows, and fails on any skipped test — a green job that quietly skipped
+  # the platform-specific cases would prove nothing.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: true
+      - name: Verify client test dependencies
+        shell: pwsh
+        run: |
+          # The sh client sub-tests skip themselves when sh/curl/jq are missing,
+          # and that skip would hide exactly what this job exists to prove.
+          if (-not (Get-Command jq -ErrorAction SilentlyContinue)) { choco install jq -y --no-progress }
+          go env GOOS GOARCH
+          sh -c "echo sh available"
+          curl --version | Select-Object -First 1
+          jq --version
+      - name: Go vet
+        run: go vet ./...
+      - name: Go tests (Windows, no skips allowed)
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'go-test-windows.log'
+          go test ./... -v -count=1 *>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { throw "go test failed on Windows with exit $code" }
+
+          # Names whose passing is the whole point of this job. TestParserDDGAndCredentialPermissions
+          # is only meaningful here because the Windows build supplies the DACL assertion.
+          $required = @(
+            'TestParserDDGAndCredentialPermissions',
+            'TestExistingKeyFilesAreRestrictedOnStartup',
+            'TestSkillClientsAgainstMockHTTP/sh/search-unicode-json',
+            'TestBraveQueryIsTruncatedByRuneAndReported'
+          )
+          foreach ($name in $required) {
+            if (-not (Select-String -Path $log -SimpleMatch "--- PASS: $name")) {
+              throw "$name did not pass on Windows"
+            }
+          }
+
+          $skipped = @(Select-String -Path $log -Pattern '--- SKIP')
+          if ($skipped.Count) { throw "tests were skipped on Windows: $($skipped.Line -join '; ')" }
+      - name: Offline web DOM contracts
+        run: node --test internal/app/web_test/web.test.mjs
