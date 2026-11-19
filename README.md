@@ -2,7 +2,7 @@
 
 面向 Agent 的自托管搜索服务。Go 服务端包含 Web 控制台；客户端是可随 Skill 分发的 sh/pwsh 脚本。
 
-v0.3.1 提供 Bing RSS / DuckDuckGo 免 Key 搜索，Tavily、Brave、Exa、知乎搜索、豆包搜索 API，Grok / xAI 官方 Responses 联网搜索、Grok 兼容中转 Chat Completions，以及自建 SearXNG JSON 搜索。多服务商并行检索，URL 去重并保留排名来源；Bing/DDG 按相关组降低重复加分。API Key 池使用加权轮询，支持并发上限、429 冷却、401/403 停用及单请求最多 3 个 Key 尝试。服务商网络错误和 5xx 不轮番重试全部 Key。
+v0.3.2 提供 Bing RSS / DuckDuckGo 免 Key 搜索，Tavily、Brave、Exa、知乎搜索、豆包搜索 API，Grok / xAI 官方 Responses 联网搜索、Grok 兼容中转 Chat Completions，以及自建 SearXNG JSON 搜索。多服务商并行检索，URL 去重并保留排名来源；Bing/DDG 按相关组降低重复加分。API Key 池使用加权轮询，支持并发上限、429 冷却、401/403 停用及单请求最多 3 个 Key 尝试。服务商网络错误和 5xx 不轮番重试全部 Key。
 
 ## 本地运行
 
@@ -11,7 +11,7 @@ go test ./...
 go run ./cmd/server
 ```
 
-打开 `http://localhost:8080`。首次启动在 `data/credentials.json` 生成独立的 `admin_token` 和 `client_token`。`data/master.key` 用于 AES-GCM 加密数据库中的服务商 Key；备份时必须同时保留数据库和 master.key。密钥文件与数据库位于同一信任边界，不能代替磁盘访问控制。
+打开 `http://localhost:8080`。首次启动在 `data/credentials.json` 生成独立的 `admin_token` 和 `client_token`。`data/master.key` 用于 AES-GCM 加密数据库中的服务商 Key；备份时必须同时保留数据库和 master.key。密钥文件与数据库位于同一信任边界，不能代替磁盘访问控制。`master.key` 与 `credentials.json` 在创建时和每次启动时都会被收窄为「仅所有者可读」：POSIX 上是 0600，Windows 上是断开继承、只授所有者 / SYSTEM / Administrators 的 DACL（Windows 会忽略 0600 模式位）；收窄失败则拒绝启动。
 
 ```sh
 docker compose up -d --build

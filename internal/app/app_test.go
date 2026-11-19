@@ -275,14 +275,35 @@ func TestParserDDGAndCredentialPermissions(t *testing.T) {
 	}
 	a := testApp(t)
 	for _, name := range []string{"master.key", "credentials.json"} {
-		info, e := os.Stat(filepath.Join(a.DataDir, name))
-		if e != nil || info.Mode().Perm() != 0600 {
-			t.Fatalf("unsafe permissions for %s", name)
-		}
+		requirePrivateFile(t, filepath.Join(a.DataDir, name))
 	}
 	page := call(a, "GET", "/", "", "")
 	if page.Code != 200 || !bytes.Contains(page.Body.Bytes(), []byte("搜索工作台")) {
 		t.Fatal("embedded UI missing")
+	}
+}
+
+// A data directory written by an older build keeps the loose permissions it was
+// created with, so startup must narrow existing key material, not just files it
+// creates itself.
+func TestExistingKeyFilesAreRestrictedOnStartup(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "master.key")
+	credsPath := filepath.Join(dir, "credentials.json")
+	if err := os.WriteFile(keyPath, make([]byte, 32), 0666); err != nil {
+		t.Fatal(err)
+	}
+	creds, _ := json.Marshal(map[string]string{"admin_token": strings.Repeat("a", 32), "client_token": strings.Repeat("b", 32)})
+	if err := os.WriteFile(credsPath, creds, 0666); err != nil {
+		t.Fatal(err)
+	}
+	a, err := New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { a.Close() })
+	for _, path := range []string{keyPath, credsPath} {
+		requirePrivateFile(t, path)
 	}
 }
 func TestNoCredentialRedirect(t *testing.T) {
