@@ -195,7 +195,13 @@ function renderResult(out) {
   if (!rows.length)
     $("#search-results").textContent =
       "本次没有获得结果。请检查服务商与完整执行记录。";
-  if (out.warnings?.length) notice(out.warnings.join("；"));
+  // Degraded attempts (for example a query shortened for one provider) are
+  // surfaced with the warnings so a shortened search is never silent.
+  const noted = [
+    ...(out.warnings || []),
+    ...(out.attempts || []).flatMap((a) => a.degraded || []),
+  ];
+  if (noted.length) notice(noted.join("；"));
 }
 $("#search-form").addEventListener("submit", async (e) => {
   e.preventDefault();

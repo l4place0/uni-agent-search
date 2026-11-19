@@ -50,7 +50,7 @@ sh 客户端依赖 curl、jq。将整个 `skills/uni-agent-search` 目录复制�
 | `POST /v1/fetch` | Client/Admin Bearer token | 读取公开 HTML / 文本 |
 | `/api/admin/*` | Admin Bearer token | 面板管理接口 |
 
-搜索输入示例：`{"query":"Go HTTP server","max_results":8,"providers":["tavily"],"include_domains":["go.dev"],"no_cache":false}`。不传 providers 时使用所有启用的服务商。没有结果时返回 HTTP 502 和完整尝试记录；部分成功返回结果及 warnings。
+搜索输入示例：`{"query":"Go HTTP server","max_results":8,"providers":["tavily"],"include_domains":["go.dev"],"no_cache":false}`。不传 providers 时使用所有启用的服务商。没有结果时返回 HTTP 502 和完整尝试记录；部分成功返回结果及 warnings。查询最长 2000 个字符（按字符计，不按字节）；某个服务商因此需要缩短查询时（如 Brave 的 400 字符上限），该次 attempt 会带 `degraded` 说明，面板同时提示，不静默改动检索条件。
 
 读取输入示例：`{"url":"https://go.dev/doc/","focus":"modules","offset":0,"limit":16000}`。正文按字符窗口返回，可用 next_offset 继续读取；每次会重新抓取，页面可能变化。读取请求阻止本地、私网、保留地址和重定向绕过。
 
