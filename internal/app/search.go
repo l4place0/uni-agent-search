@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/net/html"
 )
@@ -28,6 +29,26 @@ const defaultAccept = "application/json,application/xml,text/html"
 // or '*/*'") before the request reaches search. We send the exact JSON type
 // rather than "*/*" so a future Brave change cannot silently widen the response.
 const braveAccept = "application/json"
+
+// braveQueryLimit is Brave's documented maximum for the q parameter (400
+// characters). Longer queries are rejected with 422 VALIDATION upstream, so the
+// Brave branch cuts the tail instead of failing the whole provider; the cut is
+// reported on the attempt and in the log, never silently.
+const braveQueryLimit = 400
+
+// limitQuery returns the query to send for this provider plus a degradation
+// note when it had to be shortened. Slicing by rune keeps the result valid
+// UTF-8, so a multi-byte character is never split in half.
+func limitQuery(kind, query string) (string, string) {
+	if kind != "brave" {
+		return query, ""
+	}
+	runes := []rune(query)
+	if len(runes) <= braveQueryLimit {
+		return query, ""
+	}
+	return string(runes[:braveQueryLimit]), fmt.Sprintf("q truncated %d->%d", len(runes), braveQueryLimit)
+}
 
 type Hit struct {
 	Title       string         `json:"title"`
@@ -49,12 +70,13 @@ type SearchInput struct {
 	NoCache        bool     `json:"no_cache,omitempty"`
 }
 type Attempt struct {
-	Provider string `json:"provider"`
-	KeyID    int64  `json:"key_id,omitempty"`
-	OK       bool   `json:"ok"`
-	Error    string `json:"error,omitempty"`
-	Elapsed  int64  `json:"elapsed_ms"`
-	Count    int    `json:"result_count"`
+	Provider string   `json:"provider"`
+	KeyID    int64    `json:"key_id,omitempty"`
+	OK       bool     `json:"ok"`
+	Error    string   `json:"error,omitempty"`
+	Elapsed  int64    `json:"elapsed_ms"`
+	Count    int      `json:"result_count"`
+	Degraded []string `json:"degraded,omitempty"`
 }
 type SearchOutput struct {
 	Query        string    `json:"query"`
@@ -378,6 +400,14 @@ func (a *App) providerSearch(ctx context.Context, p Provider, query string, coun
 	attempts := []Attempt{}
 	excluded := map[int64]bool{}
 	isKeyless := keyless(p.Kind)
+	// Shorten the query before the key loop so every attempt of this provider
+	// reports the same degradation exactly once.
+	query, degraded := limitQuery(p.Kind, query)
+	var notes []string
+	if degraded != "" {
+		a.logger.Info(degraded, "provider", p.ID)
+		notes = []string{degraded}
+	}
 	for tries := 0; tries < 3; tries++ {
 		start := time.Now()
 		var k Key
@@ -385,7 +415,7 @@ func (a *App) providerSearch(ctx context.Context, p Provider, query string, coun
 		if !isKeyless {
 			k, err = a.acquire(p.ID, excluded)
 			if err != nil {
-				attempts = append(attempts, Attempt{Provider: p.ID, Error: err.Error()})
+				attempts = append(attempts, Attempt{Provider: p.ID, Error: err.Error(), Degraded: notes})
 				if errors.Is(err, errStorage) {
 					return nil, attempts, err
 				}
@@ -394,7 +424,7 @@ func (a *App) providerSearch(ctx context.Context, p Provider, query string, coun
 			excluded[k.ID] = true
 		}
 		hits, err := a.requestProvider(ctx, p, k.secret, query, count)
-		attempt := Attempt{Provider: p.ID, KeyID: k.ID, OK: err == nil, Elapsed: time.Since(start).Milliseconds(), Count: len(hits)}
+		attempt := Attempt{Provider: p.ID, KeyID: k.ID, OK: err == nil, Elapsed: time.Since(start).Milliseconds(), Count: len(hits), Degraded: notes}
 		outcome := classifyProviderOutcome(err, time.Now())
 		attempt.Error = outcome.reason
 		if err != nil {
@@ -558,8 +588,10 @@ func (a *App) search(ctx context.Context, in SearchInput) (SearchOutput, error) 
 		return SearchOutput{}, errStorage
 	}
 	in.Query = strings.TrimSpace(in.Query)
-	if in.Query == "" || len(in.Query) > 2000 {
-		return SearchOutput{}, errors.New("query must contain 1–2000 bytes")
+	// Count characters, not bytes: a byte limit rejects Chinese queries at a
+	// third of the stated length and disagrees with every provider-side limit.
+	if in.Query == "" || utf8.RuneCountInString(in.Query) > 2000 {
+		return SearchOutput{}, errors.New("query must contain 1–2000 characters")
 	}
 	if in.MaxResults == 0 {
 		in.MaxResults = 8

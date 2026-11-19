@@ -97,6 +97,14 @@ test('admin API handles auth and structured failures without token output', asyn
   assert.equal(b.elements.get('#login-dialog').open, true);
 });
 
+test('a shortened provider query is surfaced, never silent', () => {
+  const b = browser();
+  b.run(`renderResult({results:[{title:'Go docs',url:'https://go.dev/doc/',snippet:'Official',providers:['brave']}],warnings:[],attempts:[{provider:'brave',ok:true,result_count:1,degraded:['q truncated 2000->400']}]})`);
+  assert.match(b.elements.get('#notice').textContent, /q truncated 2000->400/);
+  b.run(`renderResult({results:[],warnings:['partial failure'],attempts:[{provider:'brave',ok:false,error:'upstream'}]})`);
+  assert.match(b.elements.get('#notice').textContent, /partial failure/);
+});
+
 test('provider and key controls render through safe DOM operations', () => {
   const b = browser();
   b.run(`providers=[{id:'tavily',kind:'tavily',name:'Tavily',base_url:'https://example.com',enabled:true,timeout_seconds:15}];keys=[{id:7,provider_id:'tavily',label:'<script>label</script>',masked:'••••fake',enabled:true,cooldown_until:0,weight:1,max_concurrent:2,in_flight:0,uses:2,successes:1}];renderProviders();`);
