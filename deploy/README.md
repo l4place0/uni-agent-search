@@ -14,8 +14,8 @@
 mkdir -p dist
 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/sas-server ./cmd/server
 cp /etc/ssl/certs/ca-certificates.crt dist/ca-certificates.crt
-docker build -f Dockerfile.prebuilt -t uni-agent-search:0.3.1 .
-docker save -o dist/sas-image-0.3.1.tar uni-agent-search:0.3.1
+docker build -f Dockerfile.prebuilt -t uni-agent-search:0.3.2 .
+docker save -o dist/sas-image-0.3.2.tar uni-agent-search:0.3.2
 ```
 
 在 Windows PowerShell 7 中指定自己的 SSH 目标和 WSLC 会话：
@@ -24,7 +24,7 @@ docker save -o dist/sas-image-0.3.1.tar uni-agent-search:0.3.1
 pwsh -NoProfile -File deploy/deploy-wslc.ps1 `
   -RemoteHost user@your-server `
   -Session your-wslc-session `
-  -RemoteDirectory C:\containers\uni-agent-search\releases\0.3.1
+  -RemoteDirectory C:\containers\uni-agent-search\releases\0.3.2
 ```
 
 脚本导入并推送镜像、创建 `sas-data` 数据卷，通过普通用户交互式计划任务启动容器。默认发布到宿主机 `127.0.0.1:8098`；需要其他地址时传入 `-BindAddress`。已存在源码 staging 目录或同名容器时部署停止。临时任务名输出到终端，验收后可自行移除。
@@ -51,14 +51,14 @@ wslc --session your-wslc-session exec uni-agent-search cat /data/credentials.jso
 
 ```powershell
 .\update-wslc.ps1 -Session your-wslc-session `
-  -Image 127.0.0.1:5000/uni-agent-search:0.3.1
+  -Image 127.0.0.1:5000/uni-agent-search:0.3.2
 ```
 
 `-ContainerName` 默认 `uni-agent-search`，只接受 `uni-agent-search` / `super-agent-search`。改名（v0.3.0）之前创建、仍叫 `super-agent-search` 的容器必须显式传入，否则脚本查不到容器会直接失败：
 
 ```powershell
 .\update-wslc.ps1 -Session your-wslc-session -ContainerName super-agent-search `
-  -Image 127.0.0.1:5000/uni-agent-search:0.3.1
+  -Image 127.0.0.1:5000/uni-agent-search:0.3.2
 ```
 
 先确认实际容器名：

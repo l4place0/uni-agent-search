@@ -19,7 +19,7 @@ import (
 	"uni-agent-search/internal/credential"
 )
 
-const Version = "0.3.1"
+const Version = "0.3.2"
 
 type Provider struct {
 	ID         string `json:"id"`
