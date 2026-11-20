@@ -1,6 +1,6 @@
 services:
   search:
-    image: ${SAS_IMAGE:-uni-agent-search:0.3.2}
+    image: ${SAS_IMAGE:-uni-agent-search:0.3.3}
     build: .
     ports:
       - "${SAS_BIND:-127.0.0.1}:${SAS_PORT:-8098}:8080"
