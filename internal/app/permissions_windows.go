@@ -2,7 +2,11 @@
 
 package app
 
-import "golang.org/x/sys/windows"
+import (
+	"fmt"
+
+	"golang.org/x/sys/windows"
+)
 
 // protectPrivateFile keeps a file holding key material readable only by its
 // owner. Windows ignores the 0600 mode passed to CreateFile, so a freshly
@@ -12,6 +16,13 @@ import "golang.org/x/sys/windows"
 // inheritance bits in a mode, so the DACL is replaced and marked protected
 // instead: owner, SYSTEM and Administrators only.
 func protectPrivateFile(path string) error {
+	if err := restrictToOwner(path); err != nil {
+		return fmt.Errorf("restrict permissions on %s: %w", path, err)
+	}
+	return nil
+}
+
+func restrictToOwner(path string) error {
 	token, err := windows.OpenCurrentProcessToken()
 	if err != nil {
 		return err

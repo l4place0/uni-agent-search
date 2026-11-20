@@ -19,7 +19,7 @@ import (
 	"uni-agent-search/internal/credential"
 )
 
-const Version = "0.3.2"
+const Version = "0.3.3"
 
 type Provider struct {
 	ID         string `json:"id"`
@@ -113,7 +113,7 @@ func New(dir string) (*App, error) {
 	// Narrow a key file that already existed, not just a freshly created one:
 	// data directories written by an older build carry the loose inherited ACL.
 	if err = protectPrivateFile(keyPath); err != nil {
-		return nil, fmt.Errorf("restrict permissions on %s: %w", keyPath, err)
+		return nil, err
 	}
 	keyCipher, err := credential.New(master)
 	if err != nil {
@@ -138,7 +138,7 @@ func New(dir string) (*App, error) {
 		return nil, err
 	}
 	if err = protectPrivateFile(credsPath); err != nil {
-		return nil, fmt.Errorf("restrict permissions on %s: %w", credsPath, err)
+		return nil, err
 	}
 	if v := os.Getenv("SAS_ADMIN_TOKEN"); v != "" {
 		creds.Admin = v
