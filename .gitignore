@@ -15,3 +15,4 @@ deploy/verification*.md
 recovery-*.clixml
 __pycache__/
 docs/audit/*.json.partial
+worklog/
